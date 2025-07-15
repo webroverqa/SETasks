@@ -54,12 +54,10 @@
 
     <div id="superAdminDashboard" style="display:none;">
       <h2>Super Admin Dashboard</h2>
-
       <!-- Create Company -->
       <h3>Create New Company</h3>
       <input type="text" id="companyName" placeholder="Company Name" />
       <button id="createCompanyBtn">Create Company</button>
-
       <!-- Create Admin -->
       <h3>Create Admin Account</h3>
       <input type="text" id="adminFullName" placeholder="Full Name" />
@@ -67,6 +65,30 @@
       <input type="password" id="adminPassword" placeholder="Password" />
       <select id="adminCompanySelect"></select>
       <button id="createAdminBtn">Create Admin</button>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="adminDashboard" style="display:none;">
+      <h2>Admin Dashboard</h2>
+
+      <!-- Create User -->
+      <h3>Create New User</h3>
+      <input type="text" id="userFullName" placeholder="Full Name" />
+      <input type="email" id="userEmail" placeholder="User Email" />
+      <input type="password" id="userPassword" placeholder="Password" />
+      <button id="createUserBtn">Create User</button>
+
+      <!-- Create Task -->
+      <h3>Create Task</h3>
+      <input type="text" id="taskTitle" placeholder="Task Title" />
+      <textarea id="taskDescription" placeholder="Task Description"></textarea>
+      <label>Assign To:</label>
+      <select id="userSelect" multiple size="5" style="width:100%;"></select>
+      <button id="createTaskBtn">Create Task</button>
+
+      <!-- View Tasks -->
+      <h3>All Tasks</h3>
+      <div id="taskList"></div>
     </div>
   </div>
   <div class="container">

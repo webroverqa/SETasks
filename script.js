@@ -78,14 +78,20 @@ document.addEventListener('DOMContentLoaded', function () {
         userEmail.textContent = `Logged in as: ${user.email}`;
         loadTasks(); // 👈 Only load tasks if logged in
 
-        // Show Super Admin Dashboard if user is super_admin
         db.collection("users").doc(user.uid).get().then(doc => {
           const data = doc.data();
           if (data && data.role === "super_admin") {
             document.getElementById("superAdminDashboard").style.display = "block";
+            document.getElementById("adminDashboard").style.display = "none";
             loadCompanyList(); // Load companies into dropdown
+          } else if (data && data.role === "admin") {
+            document.getElementById("superAdminDashboard").style.display = "none";
+            document.getElementById("adminDashboard").style.display = "block";
+            loadCompanyUsers(data.companyId); // Load users for admin's company
+            loadAdminTasks(data.companyId);   // Show tasks for admin's company
           } else {
             document.getElementById("superAdminDashboard").style.display = "none";
+            document.getElementById("adminDashboard").style.display = "none";
           }
         });
       } else {
@@ -94,6 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
         userSection.style.display = 'none';
         tasksContainer.innerHTML = ''; // Clear tasks if logged out
         document.getElementById("superAdminDashboard").style.display = "none";
+        document.getElementById("adminDashboard").style.display = "none";
       }
     });
 
@@ -606,6 +613,24 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 
+    function loadCompanyUsers(companyId) {
+      const select = document.getElementById("userSelect");
+      select.innerHTML = "";
+
+      db.collection("users")
+        .where("companyId", "==", companyId)
+        .where("role", "==", "user")
+        .get()
+        .then(snapshot => {
+          snapshot.forEach(doc => {
+            const option = document.createElement("option");
+            option.value = doc.id;
+            option.textContent = doc.data().fullName + " (" + doc.data().email + ")";
+            select.appendChild(option);
+          });
+        });
+    }
+
     // Create Company Button Logic
     document.getElementById("createCompanyBtn").onclick = () => {
       const companyName = document.getElementById("companyName").value.trim();
@@ -658,4 +683,93 @@ document.addEventListener('DOMContentLoaded', function () {
         })
         .catch(err => alert("❌ Error: " + err.message));
     };
+
+    document.getElementById("createUserBtn").onclick = () => {
+      const fullName = document.getElementById("userFullName").value.trim();
+      const email = document.getElementById("userEmail").value.trim();
+      const password = document.getElementById("userPassword").value.trim();
+
+      const admin = firebase.auth().currentUser;
+
+      // Get admin's company ID from Firestore
+      db.collection("users").doc(admin.uid).get().then(doc => {
+        const companyId = doc.data().companyId;
+
+        return firebase.auth().createUserWithEmailAndPassword(email, password)
+          .then(userCred => {
+            return db.collection("users").doc(userCred.user.uid).set({
+              uid: userCred.user.uid,
+              email,
+              fullName,
+              role: "user",
+              companyId
+            });
+          }).then(() => {
+            alert("✅ User created!");
+            loadCompanyUsers(companyId); // Refresh dropdown
+            // Optionally clear fields after creation
+            document.getElementById("userFullName").value = "";
+            document.getElementById("userEmail").value = "";
+            document.getElementById("userPassword").value = "";
+            // Sign out new user and reload to stay as admin
+            firebase.auth().signOut().then(() => location.reload());
+          });
+      }).catch(err => alert("❌ " + err.message));
+    };
+
+    document.getElementById("createTaskBtn").onclick = () => {
+      const title = document.getElementById("taskTitle").value.trim();
+      const description = document.getElementById("taskDescription").value.trim();
+      const assignedTo = Array.from(document.getElementById("userSelect").selectedOptions).map(opt => opt.value);
+      const createdBy = firebase.auth().currentUser.uid;
+
+      if (!title || assignedTo.length === 0) {
+        return alert("Please enter task title and assign at least one user.");
+      }
+
+      db.collection("users").doc(createdBy).get().then(doc => {
+        const companyId = doc.data().companyId;
+
+        return db.collection("tasks").add({
+          title,
+          description,
+          assignedTo,
+          createdBy,
+          companyId,
+          createdAt: new Date().toISOString(),
+          status: "Pending"
+        }).then(() => {
+          alert("✅ Task created!");
+          loadAdminTasks(companyId);
+          // Optionally clear fields after creation
+          document.getElementById("taskTitle").value = "";
+          document.getElementById("taskDescription").value = "";
+          document.getElementById("userSelect").selectedIndex = -1;
+        });
+      });
+    };
+
+    function loadAdminTasks(companyId) {
+      const container = document.getElementById("taskList");
+      container.innerHTML = "";
+
+      db.collection("tasks").where("companyId", "==", companyId).get().then(snapshot => {
+        if (snapshot.empty) {
+          container.innerHTML = "<p>No tasks yet.</p>";
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const task = doc.data();
+          const div = document.createElement("div");
+          div.innerHTML = `
+            <strong>${task.title}</strong><br/>
+            ${task.description}<br/>
+            Assigned to: ${task.assignedTo ? task.assignedTo.length : 0} user(s)<br/>
+            Status: ${task.status}<hr/>
+          `;
+          container.appendChild(div);
+        });
+      });
+    }
 });
