@@ -27,8 +27,34 @@ document.addEventListener('DOMContentLoaded', function () {
       const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
       auth.signInWithEmailAndPassword(email, password)
-        .then(() => console.log("Logged in"))
-        .catch(err => alert("Login failed: " + err.message));
+        .then(userCredential => {
+          const uid = userCredential.user.uid;
+          return db.collection("users").doc(uid).get();
+        })
+        .then(doc => {
+          if (doc.exists) {
+            const data = doc.data();
+            // Display full name and role (make sure these elements exist in your HTML)
+            if (document.getElementById("userName")) {
+              document.getElementById("userName").textContent = data.fullName;
+            }
+            if (document.getElementById("userRole")) {
+              document.getElementById("userRole").textContent = data.role;
+            }
+
+            // Redirect or show dashboard based on role
+            if (data.role === "super_admin") {
+              showSuperAdminDashboard();
+            } else if (data.role === "admin") {
+              showAdminDashboard(data.companyId);
+            } else {
+              showUserDashboard(data.companyId);
+            }
+          }
+        })
+        .catch(error => {
+          alert("Login error: " + error.message);
+        });
     };
 
     // Signup
@@ -529,4 +555,28 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         `;
     }
+
+    // Example: Call this function when Super Admin or Admin creates a user
+    function createUserWithRole(email, password, fullName, role, companyId = null) {
+      auth.createUserWithEmailAndPassword(email, password)
+        .then(userCredential => {
+          const user = userCredential.user;
+          return db.collection("users").doc(user.uid).set({
+            uid: user.uid,
+            email: user.email,
+            fullName: fullName,
+            role: role,
+            companyId: companyId || null
+          });
+        })
+        .then(() => {
+          alert("✅ User created successfully.");
+        })
+        .catch(error => {
+          alert("❌ Error creating user: " + error.message);
+        });
+    }
+
+    // Example usage (replace with your actual form values):
+    // createUserWithRole("test@example.com", "password123", "Rithu", "admin", "company123");
 });

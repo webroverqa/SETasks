@@ -10,20 +10,22 @@
 
   <!-- Firebase Core (required) -->
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
   <script>
     const firebaseConfig = {
-      apiKey: "AIzaSyBYNDUzi3CHs37Uol7NMDq6lVwz19eNpBI",
-      authDomain: "taskmanagerapp-894d6.firebaseapp.com",
-      projectId: "taskmanagerapp-894d6",
-      storageBucket: "taskmanagerapp-894d6.firebasestorage.app",
-      messagingSenderId: "673006134732",
-      appId: "1:673006134732:web:60baa331ef19d5b7fae969",
-      measurementId: "G-3TZZQ0VHF1"
-    };
+  apiKey: "AIzaSyCuPj8oxeObWjm7ykDLL1-a9xuJ9yim9xI",
+  authDomain: "setasks-dc876.firebaseapp.com",
+  projectId: "setasks-dc876",
+  storageBucket: "setasks-dc876.firebasestorage.app",
+  messagingSenderId: "324371355585",
+  appId: "1:324371355585:web:072971abe7cf2e788ec140",
+  measurementId: "G-8LX3BVLN9D"
+};
+
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.firestore();
   </script>
 </head>
@@ -133,6 +135,10 @@
 
     <div id="tasksContainer">
       <!-- Tasks will be loaded here -->
+    </div>
+
+    <div class="user-info" style="display:none;" id="userInfo">
+      Welcome, <span id="userName"></span> (<span id="userRole"></span>)
     </div>
   </div>
 
