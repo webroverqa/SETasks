@@ -801,7 +801,10 @@ document.addEventListener('DOMContentLoaded', function () {
           div.innerHTML = `
             <h4>${task.title}</h4>
             <p>${task.description}</p>
-            <strong>Status:</strong> ${task.status}<br/>
+            <strong>Status:</strong> <span id="status-${taskId}">${task.status}</span><br/>
+            ${task.status !== "Completed" ? `
+              <button onclick="markTaskCompleted('${taskId}')">Mark as Completed</button>
+            ` : `<span style="color:green;">✔ Completed</span>`}
             <textarea placeholder="Write a comment..." id="comment-${taskId}" rows="2" style="width:100%;"></textarea>
             <button onclick="submitComment('${taskId}')">Submit Comment</button>
             <div id="comments-${taskId}"></div>
@@ -845,5 +848,16 @@ document.addEventListener('DOMContentLoaded', function () {
             container.innerHTML += `<div><small>• ${comment.text}</small></div>`;
           });
         });
+    }
+
+    function markTaskCompleted(taskId) {
+      db.collection("tasks").doc(taskId).update({
+        status: "Completed"
+      }).then(() => {
+        alert("✅ Task marked as completed.");
+        document.getElementById(`status-${taskId}`).textContent = "Completed";
+      }).catch(err => {
+        alert("❌ Failed to update task: " + err.message);
+      });
     }
 });
