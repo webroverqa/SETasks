@@ -76,26 +76,27 @@ document.addEventListener('DOMContentLoaded', function () {
         signupForm.style.display = 'none';
         userSection.style.display = 'block';
         userEmail.textContent = `Logged in as: ${user.email}`;
-        loadTasks();
 
         db.collection("users").doc(user.uid).get().then(doc => {
           const data = doc.data();
+
           if (data && data.role === "super_admin") {
             document.getElementById("superAdminDashboard").style.display = "block";
             document.getElementById("adminDashboard").style.display = "none";
             document.getElementById("userDashboard").style.display = "none";
             loadCompanyList();
+            // Optionally: loadTasks() for super admin overview
           } else if (data && data.role === "admin") {
             document.getElementById("superAdminDashboard").style.display = "none";
             document.getElementById("adminDashboard").style.display = "block";
             document.getElementById("userDashboard").style.display = "none";
             loadCompanyUsers(data.companyId);
-            loadAdminTasks(data.companyId);
+            loadAdminTasks(data.companyId); // or loadTasks(data.companyId) if you want
           } else if (data && data.role === "user") {
             document.getElementById("superAdminDashboard").style.display = "none";
             document.getElementById("adminDashboard").style.display = "none";
             document.getElementById("userDashboard").style.display = "block";
-            loadUserTasks(data.uid);
+            loadUserTasks(user.uid);
           } else {
             document.getElementById("superAdminDashboard").style.display = "none";
             document.getElementById("adminDashboard").style.display = "none";
@@ -128,7 +129,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function init() {
         setupEventListeners();
-        loadTasks();
     }
 
     function setupEventListeners() {
@@ -151,58 +151,66 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function loadTasks() {
-        showLoading();
-        try {
-            const user = firebase.auth().currentUser;
+    showLoading();
 
-            const snapshot = await db.collection('tasks')
-                .where('sharedWith', 'array-contains', user.uid)
-                .get();
-
-            const ownTasksSnapshot = await db.collection('tasks')
-                .where('uid', '==', user.uid)
-                .get();
-
-            const allDocs = [...snapshot.docs, ...ownTasksSnapshot.docs];
-            const seen = new Set(); // Avoid duplicates
-            tasks = [];
-
-            allDocs.forEach(doc => {
-                if (!seen.has(doc.id)) {
-                    seen.add(doc.id);
-                    const data = doc.data();
-                    // Migrate old tasks to new structure
-                    if (data.active !== undefined) {
-                        data.status = data.active ? 'Pending' : 'Cancelled';
-                        delete data.active;
-                    }
-                    if (data.time && !data.startTime) {
-                        data.startTime = data.time;
-                        delete data.time;
-                    }
-                    if (!data.days) {
-                        data.days = 1;
-                    }
-                    tasks.push({ id: doc.id, ...data });
-                }
-            });
-
-            if (tasks.length > 0) {
-                // Sort tasks by start date (newest first) then by time
-                tasks.sort((a, b) => {
-                    const dateCompare = new Date(b.date) - new Date(a.date);
-                    if (dateCompare === 0) {
-                        return (b.startTime || '').localeCompare(a.startTime || '');
-                    }
-                    return dateCompare;
-                });
-            }
-            renderTasks();
-        } catch (error) {
-            console.error("Error loading tasks:", error);
-            showError("Error loading tasks.");
-        }
+    const user = firebase.auth().currentUser;
+    if (!user) {
+        console.warn("User not logged in, skipping loadTasks");
+        return;
     }
+
+    try {
+        const snapshot = await db.collection('tasks')
+            .where('sharedWith', 'array-contains', user.uid)
+            .get();
+
+        const ownTasksSnapshot = await db.collection('tasks')
+            .where('uid', '==', user.uid)
+            .get();
+
+        const allDocs = [...snapshot.docs, ...ownTasksSnapshot.docs];
+        const seen = new Set();
+        tasks = [];
+
+        allDocs.forEach(doc => {
+            if (!seen.has(doc.id)) {
+                seen.add(doc.id);
+                const data = doc.data();
+
+                // Optional cleanup
+                if (data.active !== undefined) {
+                    data.status = data.active ? 'Pending' : 'Cancelled';
+                    delete data.active;
+                }
+
+                if (data.time && !data.startTime) {
+                    data.startTime = data.time;
+                    delete data.time;
+                }
+
+                if (!data.days) {
+                    data.days = 1;
+                }
+
+                tasks.push({ id: doc.id, ...data });
+            }
+        });
+
+        tasks.sort((a, b) => {
+            const dateCompare = new Date(b.date) - new Date(a.date);
+            return dateCompare === 0
+                ? (b.startTime || '').localeCompare(a.startTime || '')
+                : dateCompare;
+        });
+
+        renderTasks();
+
+    } catch (error) {
+        console.error("Error loading tasks:", error);
+        showError("Error loading tasks.");
+    }
+}
+
 
     function openModal(task = null) {
         const modalTitle = document.getElementById('modalTitle');
@@ -861,3 +869,14 @@ document.addEventListener('DOMContentLoaded', function () {
       });
     }
 });
+
+function isSuperAdmin() {
+  return request.auth != null &&
+    get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "super_admin";
+}
+
+match /tasks/{taskId} {
+  allow read: if isSuperAdmin() ||
+              request.auth.uid == resource.data.createdBy ||
+              request.auth.uid in resource.data.assignedTo;
+}
