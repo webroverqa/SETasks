@@ -77,11 +77,23 @@ document.addEventListener('DOMContentLoaded', function () {
         userSection.style.display = 'block';
         userEmail.textContent = `Logged in as: ${user.email}`;
         loadTasks(); // 👈 Only load tasks if logged in
+
+        // Show Super Admin Dashboard if user is super_admin
+        db.collection("users").doc(user.uid).get().then(doc => {
+          const data = doc.data();
+          if (data && data.role === "super_admin") {
+            document.getElementById("superAdminDashboard").style.display = "block";
+            loadCompanyList(); // Load companies into dropdown
+          } else {
+            document.getElementById("superAdminDashboard").style.display = "none";
+          }
+        });
       } else {
         loginForm.style.display = 'block';
         signupForm.style.display = 'none';
         userSection.style.display = 'none';
         tasksContainer.innerHTML = ''; // Clear tasks if logged out
+        document.getElementById("superAdminDashboard").style.display = "none";
       }
     });
 
@@ -579,4 +591,71 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Example usage (replace with your actual form values):
     // createUserWithRole("test@example.com", "password123", "Rithu", "admin", "company123");
+
+    function loadCompanyList() {
+      const select = document.getElementById("adminCompanySelect");
+      select.innerHTML = ""; // Clear old options
+
+      db.collection("companies").get().then(snapshot => {
+        snapshot.forEach(doc => {
+          const option = document.createElement("option");
+          option.value = doc.id;
+          option.textContent = doc.data().name;
+          select.appendChild(option);
+        });
+      });
+    }
+
+    // Create Company Button Logic
+    document.getElementById("createCompanyBtn").onclick = () => {
+      const companyName = document.getElementById("companyName").value.trim();
+      const currentUser = firebase.auth().currentUser;
+
+      if (!companyName) return alert("Enter company name");
+
+      db.collection("companies").add({
+        name: companyName,
+        createdBy: currentUser.uid
+      }).then(() => {
+        alert("✅ Company created.");
+        loadCompanyList(); // Refresh dropdown
+        document.getElementById("companyName").value = ""; // Clear input
+      });
+    };
+
+    // Create Admin Button Logic
+    document.getElementById("createAdminBtn").onclick = () => {
+      const fullName = document.getElementById("adminFullName").value.trim();
+      const email = document.getElementById("adminEmail").value.trim();
+      const password = document.getElementById("adminPassword").value.trim();
+      const companyId = document.getElementById("adminCompanySelect").value;
+
+      if (!fullName || !email || !password || !companyId) {
+        alert("Fill all admin fields.");
+        return;
+      }
+
+      firebase.auth().createUserWithEmailAndPassword(email, password)
+        .then(userCredential => {
+          const newUser = userCredential.user;
+          return db.collection("users").doc(newUser.uid).set({
+            uid: newUser.uid,
+            email: email,
+            fullName: fullName,
+            role: "admin",
+            companyId: companyId
+          });
+        })
+        .then(() => {
+          alert("✅ Admin account created!");
+          // Optionally clear fields after creation
+          document.getElementById("adminFullName").value = "";
+          document.getElementById("adminEmail").value = "";
+          document.getElementById("adminPassword").value = "";
+          document.getElementById("adminCompanySelect").selectedIndex = 0;
+          // Sign out new admin and reload to stay as super admin
+          firebase.auth().signOut().then(() => location.reload());
+        })
+        .catch(err => alert("❌ Error: " + err.message));
+    };
 });
