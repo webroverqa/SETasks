@@ -76,31 +76,40 @@ document.addEventListener('DOMContentLoaded', function () {
         signupForm.style.display = 'none';
         userSection.style.display = 'block';
         userEmail.textContent = `Logged in as: ${user.email}`;
-        loadTasks(); // 👈 Only load tasks if logged in
+        loadTasks();
 
         db.collection("users").doc(user.uid).get().then(doc => {
           const data = doc.data();
           if (data && data.role === "super_admin") {
             document.getElementById("superAdminDashboard").style.display = "block";
             document.getElementById("adminDashboard").style.display = "none";
-            loadCompanyList(); // Load companies into dropdown
+            document.getElementById("userDashboard").style.display = "none";
+            loadCompanyList();
           } else if (data && data.role === "admin") {
             document.getElementById("superAdminDashboard").style.display = "none";
             document.getElementById("adminDashboard").style.display = "block";
-            loadCompanyUsers(data.companyId); // Load users for admin's company
-            loadAdminTasks(data.companyId);   // Show tasks for admin's company
+            document.getElementById("userDashboard").style.display = "none";
+            loadCompanyUsers(data.companyId);
+            loadAdminTasks(data.companyId);
+          } else if (data && data.role === "user") {
+            document.getElementById("superAdminDashboard").style.display = "none";
+            document.getElementById("adminDashboard").style.display = "none";
+            document.getElementById("userDashboard").style.display = "block";
+            loadUserTasks(data.uid);
           } else {
             document.getElementById("superAdminDashboard").style.display = "none";
             document.getElementById("adminDashboard").style.display = "none";
+            document.getElementById("userDashboard").style.display = "none";
           }
         });
       } else {
         loginForm.style.display = 'block';
         signupForm.style.display = 'none';
         userSection.style.display = 'none';
-        tasksContainer.innerHTML = ''; // Clear tasks if logged out
+        tasksContainer.innerHTML = '';
         document.getElementById("superAdminDashboard").style.display = "none";
         document.getElementById("adminDashboard").style.display = "none";
+        document.getElementById("userDashboard").style.display = "none";
       }
     });
 
@@ -771,5 +780,70 @@ document.addEventListener('DOMContentLoaded', function () {
           container.appendChild(div);
         });
       });
+    }
+
+    function loadUserTasks(userUID) {
+      const container = document.getElementById("userTasks");
+      container.innerHTML = "";
+
+      db.collection("tasks").where("assignedTo", "array-contains", userUID).get().then(snapshot => {
+        if (snapshot.empty) {
+          container.innerHTML = "<p>No tasks assigned to you.</p>";
+          return;
+        }
+
+        snapshot.forEach(doc => {
+          const task = doc.data();
+          const taskId = doc.id;
+
+          const div = document.createElement("div");
+          div.classList.add("task-card");
+          div.innerHTML = `
+            <h4>${task.title}</h4>
+            <p>${task.description}</p>
+            <strong>Status:</strong> ${task.status}<br/>
+            <textarea placeholder="Write a comment..." id="comment-${taskId}" rows="2" style="width:100%;"></textarea>
+            <button onclick="submitComment('${taskId}')">Submit Comment</button>
+            <div id="comments-${taskId}"></div>
+            <hr/>
+          `;
+
+          container.appendChild(div);
+
+          loadComments(taskId); // Load existing comments
+        });
+      });
+    }
+
+    function submitComment(taskId) {
+      const commentText = document.getElementById(`comment-${taskId}`).value.trim();
+      const user = firebase.auth().currentUser;
+
+      if (!commentText) return;
+
+      db.collection("tasks").doc(taskId).collection("comments").add({
+        userId: user.uid,
+        text: commentText,
+        timestamp: new Date().toISOString()
+      }).then(() => {
+        document.getElementById(`comment-${taskId}`).value = "";
+        loadComments(taskId); // Reload comments
+      });
+    }
+
+    function loadComments(taskId) {
+      const container = document.getElementById(`comments-${taskId}`);
+      container.innerHTML = "<small>Loading comments...</small>";
+
+      db.collection("tasks").doc(taskId).collection("comments")
+        .orderBy("timestamp")
+        .get()
+        .then(snapshot => {
+          container.innerHTML = "<strong>Comments:</strong><br/>";
+          snapshot.forEach(doc => {
+            const comment = doc.data();
+            container.innerHTML += `<div><small>• ${comment.text}</small></div>`;
+          });
+        });
     }
 });
